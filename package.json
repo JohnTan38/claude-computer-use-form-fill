@@ -1,0 +1,18 @@
+{
+  "name": "claude-autoform",
+  "version": "1.0.0",
+  "description": "Automate form filling with Claude Computer-Use API",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "csv-parse": "^6.1.0",
+    "express": "^4.19.2",
+    "multer": "^2.0.2",
+    "playwright": "^1.58.2"
+  }
+}
