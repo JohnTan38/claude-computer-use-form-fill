@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AUTOFORM — Claude Computer-Use Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-void:    #0a0a0c;
+      --bg-panel:   #111114;
+      --bg-raised:  #18181d;
+      --bg-input:   #1e1e26;
+      --border:     #2a2a35;
+      --border-lit: #3d3d52;
+      --amber:      #f5a623;
+      --amber-dim:  #b87318;
+      --amber-glow: rgba(245,166,35,0.15);
+      --amber-soft: rgba(245,166,35,0.06);
+      --green:      #39d353;
+      --green-soft: rgba(57,211,83,0.08);
+      --red:        #ff4d4d;
+      --red-soft:   rgba(255,77,77,0.08);
+      --blue:       #5b8af5;
+      --purple:     #9b7fe8;
+      --text-hi:    #f0eeea;
+      --text-mid:   #8a8899;
+      --text-lo:    #464557;
+      --mono:       'Share Tech Mono', monospace;
+      --display:    'Bebas Neue', cursive;
+      --body:       'DM Sans', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-void);
+      color: var(--text-hi);
+      font-family: var(--body);
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Layout ─────────────────────────────────── */
+    #root { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; border-bottom: 1px solid var(--border);
+      background: var(--bg-panel); position: sticky; top: 0; z-index: 100;
+    }
+    .header-logo { display: flex; align-items: baseline; gap: 10px; }
+    .logo-text { font-family: var(--display); font-size: 28px; letter-spacing: 3px; color: var(--amber); text-shadow: 0 0 20px var(--amber-dim); }
+    .logo-sub  { font-family: var(--mono); font-size: 10px; color: var(--text-mid); letter-spacing: 2px; text-transform: uppercase; }
+    .header-status { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--text-mid); letter-spacing: 1px; }
+
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-lo); transition: all 0.3s; }
+    .status-dot.running { background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: pulse-dot 1.2s ease-in-out infinite; }
+    .status-dot.success { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-dot.error   { background: var(--red);   box-shadow: 0 0 8px var(--red); }
+
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+    .main-grid {
+      display: grid; grid-template-columns: 400px 1fr; gap: 0;
+      height: calc(100vh - 57px); overflow: hidden;
+    }
+
+    /* ── Left Panel ──────────────────────────────── */
+    .config-panel {
+      background: var(--bg-panel); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto;
+    }
+    .config-panel::-webkit-scrollbar { width: 4px; }
+    .config-panel::-webkit-scrollbar-track { background: transparent; }
+    .config-panel::-webkit-scrollbar-thumb { background: var(--border-lit); border-radius: 2px; }
+
+    .section { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+
+    .section-label {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--amber); margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--amber-dim), transparent); }
+
+    .field-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .field-row:last-child { margin-bottom: 0; }
+
+    label { font-family: var(--mono); font-size: 11px; color: var(--text-mid); letter-spacing: 1px; }
+
+    input[type="text"], input[type="password"], input[type="url"], textarea {
+      background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px;
+      color: var(--text-hi); font-family: var(--mono); font-size: 12px;
+      padding: 9px 12px; width: 100%; transition: border-color .2s, box-shadow .2s; outline: none;
+    }
+    input[type="text"]:focus, input[type="password"]:focus, input[type="url"]:focus, textarea:focus {
+      border-color: var(--amber-dim); box-shadow: 0 0 0 3px var(--amber-soft);
+    }
+    textarea { resize: vertical; min-height: 90px; font-size: 11px; line-height: 1.7; }
+    .field-hint { font-size: 10px; color: var(--text-lo); font-family: var(--mono); }
+
+    /* Mode tabs */
+    .mode-tabs {
+      display: flex; border-bottom: 1px solid var(--border);
+      background: var(--bg-panel); flex-shrink: 0;
+    }
+    .mode-tab {
+      flex: 1; padding: 11px 8px; font-family: var(--mono); font-size: 11px;
+      letter-spacing: 2px; text-transform: uppercase; text-align: center;
+      color: var(--text-lo); cursor: pointer; border: none; background: none;
+      border-bottom: 2px solid transparent; transition: all .2s;
+    }
+    .mode-tab:hover { color: var(--text-mid); }
+    .mode-tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+    /* Form fields list */
+    .fields-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .field-entry { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; }
+    .field-entry input { font-size: 11px; padding: 7px 9px; }
+
+    .btn-icon {
+      background: none; border: 1px solid var(--border); color: var(--text-mid);
+      border-radius: 4px; width: 30px; height: 30px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: all .15s; flex-shrink: 0;
+    }
+    .btn-icon:hover { border-color: var(--red); color: var(--red); }
+
+    .btn-add-field {
+      background: none; border: 1px dashed var(--border-lit); color: var(--text-mid);
+      border-radius: 4px; padding: 7px; width: 100%; cursor: pointer;
+      font-family: var(--mono); font-size: 11px; letter-spacing: 1px; transition: all .2s;
+    }
+    .btn-add-field:hover { border-color: var(--amber-dim); color: var(--amber); }
+
+    /* CSV Upload Zone */
+    .csv-upload-zone {
+      border: 1px dashed var(--border-lit); border-radius: 6px;
+      padding: 20px 14px; text-align: center; cursor: pointer;
+      transition: all .2s; position: relative;
+    }
+    .csv-upload-zone:hover, .csv-upload-zone.drag-over {
+      border-color: var(--amber-dim); background: var(--amber-soft);
+    }
+    .csv-upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .csv-upload-icon { font-size: 28px; margin-bottom: 6px; opacity: 0.5; }
+    .csv-upload-label { font-family: var(--mono); font-size: 11px; color: var(--text-mid); letter-spacing: 1px; }
+    .csv-upload-hint  { font-family: var(--mono); font-size: 10px; color: var(--text-lo); margin-top: 4px; }
+
+    .csv-file-info {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: 4px; padding: 8px 12px; margin-top: 10px;
+    }
+    .csv-file-icon { font-size: 18px; }
+    .csv-file-name { font-family: var(--mono); font-size: 11px; color: var(--amber); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .csv-file-rows { font-family: var(--mono); font-size: 10px; color: var(--text-lo); }
+    .btn-clear-csv {
+      background: none; border: none; color: var(--text-lo);
+      cursor: pointer; font-size: 14px; transition: color .2s; padding: 0 2px;
+    }
+    .btn-clear-csv:hover { color: var(--red); }
+
+    /* CSV preview table */
+    .csv-preview {
+      margin-top: 10px; border: 1px solid var(--border); border-radius: 4px;
+      overflow: hidden; max-height: 140px; overflow-y: auto;
+    }
+    .csv-preview::-webkit-scrollbar { width: 3px; }
+    .csv-preview::-webkit-scrollbar-track { background: transparent; }
+    .csv-preview::-webkit-scrollbar-thumb { background: var(--border-lit); }
+    .csv-preview table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 10px; }
+    .csv-preview th {
+      background: var(--bg-raised); color: var(--amber); padding: 5px 8px;
+      text-align: left; border-bottom: 1px solid var(--border);
+      font-size: 9px; letter-spacing: 1px; text-transform: uppercase; position: sticky; top: 0;
+    }
+    .csv-preview td { padding: 4px 8px; color: var(--text-mid); border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
+    .csv-preview tr:last-child td { border-bottom: none; }
+    .csv-preview tr:hover td { background: var(--amber-soft); }
+
+    /* Start button */
+    .btn-start {
+      margin: 20px 24px; padding: 16px;
+      background: linear-gradient(135deg, var(--amber-dim), var(--amber));
+      border: none; border-radius: 6px; color: #0a0a0c;
+      font-family: var(--display); font-size: 22px; letter-spacing: 3px;
+      cursor: pointer; transition: all .2s; position: relative; overflow: hidden;
+      box-shadow: 0 4px 20px rgba(245,166,35,0.25);
+    }
+    .btn-start::before {
+      content: ''; position: absolute; top: -50%; left: -60%; width: 40%; height: 200%;
+      background: rgba(255,255,255,.15); transform: skewX(-20deg); transition: left .4s;
+    }
+    .btn-start:hover::before { left: 140%; }
+    .btn-start:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(245,166,35,0.4); }
+    .btn-start:active { transform: translateY(0); }
+    .btn-start:disabled { background: var(--bg-raised); color: var(--text-lo); cursor: not-allowed; box-shadow: none; transform: none; }
+
+    .btn-stop {
+      margin: 0 24px 10px; padding: 10px; background: none;
+      border: 1px solid var(--red); border-radius: 6px; color: var(--red);
+      font-family: var(--mono); font-size: 12px; letter-spacing: 2px;
+      cursor: pointer; transition: all .2s; text-transform: uppercase;
+    }
+    .btn-stop:hover { background: rgba(255,77,77,.1); }
+
+    /* Download button */
+    .btn-download {
+      margin: 0 24px 20px; padding: 12px; background: none;
+      border: 1px solid var(--green); border-radius: 6px; color: var(--green);
+      font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+      cursor: pointer; transition: all .2s; text-transform: uppercase;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-download:hover { background: var(--green-soft); box-shadow: 0 0 12px rgba(57,211,83,.2); }
+
+    /* ── Right Panel ─────────────────────────────── */
+    .output-panel { display: grid; grid-template-rows: 1fr 260px; overflow: hidden; }
+
+    .screen-viewer { background: var(--bg-void); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+    .screen-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: var(--bg-panel);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .screen-title { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--amber); text-transform: uppercase; }
+    .iteration-badge { font-family: var(--mono); font-size: 11px; color: var(--text-mid); }
+
+    .screen-content {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      overflow: hidden; padding: 16px; position: relative;
+    }
+    .screen-content::before, .screen-content::after {
+      content: ''; position: absolute; width: 20px; height: 20px;
+      border-color: var(--amber-dim); border-style: solid; opacity: .4;
+    }
+    .screen-content::before { top: 8px; left: 8px; border-width: 1px 0 0 1px; }
+    .screen-content::after  { bottom: 8px; right: 8px; border-width: 0 1px 1px 0; }
+
+    .screen-placeholder { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--text-lo); }
+    .screen-placeholder svg { opacity: .3; }
+    .screen-placeholder p { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+
+    .screenshot-img {
+      max-width: 100%; max-height: 100%; object-fit: contain;
+      border-radius: 4px; border: 1px solid var(--border);
+      box-shadow: 0 8px 40px rgba(0,0,0,.6); animation: img-in .2s ease-out;
+    }
+    @keyframes img-in { from{opacity:0;transform:scale(.98)} to{opacity:1;transform:scale(1)} }
+
+    .progress-bar-wrap { height: 2px; background: var(--bg-raised); flex-shrink: 0; }
+    .progress-bar {
+      height: 100%; background: linear-gradient(90deg, var(--amber-dim), var(--amber));
+      transition: width .4s ease-out; box-shadow: 0 0 8px var(--amber-dim);
+    }
+
+    /* ── Batch row table (inside screen area top strip) ─── */
+    .batch-strip {
+      background: var(--bg-panel); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; max-height: 140px; overflow-y: auto;
+    }
+    .batch-strip::-webkit-scrollbar { width: 3px; }
+    .batch-strip::-webkit-scrollbar-track { background: transparent; }
+    .batch-strip::-webkit-scrollbar-thumb { background: var(--border); }
+    .batch-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
+    .batch-table th {
+      padding: 6px 14px; text-align: left; font-size: 9px; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--amber); background: var(--bg-raised);
+      border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    }
+    .batch-table td { padding: 5px 14px; color: var(--text-mid); border-bottom: 1px solid var(--border); }
+    .batch-table tr:last-child td { border-bottom: none; }
+    .batch-table tr.active td { background: var(--amber-soft); color: var(--text-hi); }
+    .batch-table tr.done td   { background: var(--green-soft); }
+    .batch-table tr.error-row td { background: var(--red-soft); }
+
+    .row-status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; letter-spacing: 1px;
+    }
+    .row-status-badge.pending  { color: var(--text-lo); }
+    .row-status-badge.active   { color: var(--amber); }
+    .row-status-badge.done     { color: var(--green); }
+    .row-status-badge.error    { color: var(--red); }
+
+    .ref-number { font-family: var(--mono); font-size: 11px; color: var(--green); letter-spacing: 1px; }
+    .ref-number.na { color: var(--text-lo); }
+
+    /* ── Log Panel ─────────────────────────────── */
+    .log-panel { background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+    .log-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .log-title { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--amber); text-transform: uppercase; }
+    .btn-clear { background: none; border: none; color: var(--text-lo); font-family: var(--mono); font-size: 10px; cursor: pointer; letter-spacing: 1px; transition: color .2s; }
+    .btn-clear:hover { color: var(--text-mid); }
+
+    .log-entries { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .log-entries::-webkit-scrollbar { width: 3px; }
+    .log-entries::-webkit-scrollbar-track { background: transparent; }
+    .log-entries::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .log-entry { display: flex; align-items: baseline; gap: 10px; padding: 3px 16px; font-family: var(--mono); font-size: 11px; line-height: 1.6; animation: entry-in .15s ease-out; }
+    @keyframes entry-in { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+
+    .log-time  { color: var(--text-lo); flex-shrink: 0; font-size: 10px; }
+    .log-icon  { flex-shrink: 0; font-size: 12px; }
+    .log-msg   { color: var(--text-mid); }
+    .log-msg.status    { color: var(--text-hi); }
+    .log-msg.action    { color: var(--blue); }
+    .log-msg.claude    { color: var(--purple); }
+    .log-msg.error     { color: var(--red); }
+    .log-msg.success   { color: var(--green); }
+    .log-msg.iteration { color: var(--amber); }
+    .log-msg.row_start { color: var(--amber); }
+    .log-msg.row_done  { color: var(--green); }
+    .log-msg.row_error { color: var(--red); }
+    .log-row-tag { font-size: 10px; color: var(--text-lo); margin-right: 2px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useRef, useCallback, useEffect } = React;
+
+const ICONS = {
+  status:    '◈',
+  action:    '⬡',
+  claude:    '◉',
+  error:     '✕',
+  success:   '✓',
+  iteration: '⟳',
+  screenshot:'◻',
+  row_start: '▶',
+  row_done:  '✓',
+  row_error: '✕',
+};
+
+function ts() {
+  return new Date().toLocaleTimeString('en-US', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return { headers: [], rows: [] };
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const rows = lines.slice(1).map(line => {
+    // Simple CSV split (handles quoted commas too)
+    const vals = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    vals.push(cur.trim());
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g, ''); });
+    return obj;
+  });
+  return { headers, rows };
+}
+
+// ─── Row Status Table ─────────────────────────────────────────────────────────
+
+function BatchTable({ csvRows, csvHeaders, rowStates, currentRow }) {
+  if (!csvRows || csvRows.length === 0) return null;
+  return (
+    <div className="batch-strip">
+      <table className="batch-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            {csvHeaders.slice(0, 3).map(h => <th key={h}>{h}</th>)}
+            <th>Status</th>
+            <th>Ref Number</th>
+          </tr>
+        </thead>
+        <tbody>
+          {csvRows.map((row, i) => {
+            const st = rowStates[i] || { status: 'pending' };
+            const rowClass = st.status === 'active' ? 'active' : st.status === 'done' ? 'done' : st.status === 'error' ? 'error-row' : '';
+            return (
+              <tr key={i} className={rowClass}>
+                <td>{i + 1}</td>
+                {csvHeaders.slice(0, 3).map(h => <td key={h} title={row[h]}>{row[h]}</td>)}
+                <td>
+                  <span className={`row-status-badge ${st.status}`}>
+                    {st.status === 'active'  && <><span style={{animation:'pulse-dot 1.2s ease-in-out infinite',display:'inline-block'}}>⬡</span> RUNNING</>}
+                    {st.status === 'done'    && <>✓ DONE</>}
+                    {st.status === 'error'   && <>✕ ERROR</>}
+                    {st.status === 'pending' && <>— PENDING</>}
+                  </span>
+                </td>
+                <td>
+                  {st.refNumber
+                    ? <span className={`ref-number ${st.refNumber === 'N/A' || st.refNumber === 'ERROR' ? 'na' : ''}`}>{st.refNumber}</span>
+                    : <span className="ref-number na">—</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────────
+
+function App() {
+  const [mode, setMode]           = useState('manual'); // 'manual' | 'csv'
+  const [apiKey, setApiKey]       = useState('');
+  const [targetUrl, setTargetUrl] = useState('https://formsmarts.com/form/2fv2');
+
+  // Manual mode
+  const [fields, setFields] = useState([
+    { key: 'First Name', value: 'John' },
+    { key: 'Last Name',  value: 'Tan'  },
+    { key: 'Email',      value: 'sxk2929@gmail.com' },
+    { key: 'Inquiry',    value: 'price quote for 2 nights stay at Raffles Hotel Singapore' },
+  ]);
+
+  // CSV mode
+  const [csvFile,    setCsvFile]    = useState(null);   // File object
+  const [csvParsed,  setCsvParsed]  = useState(null);   // { headers, rows }
+  const [dragOver,   setDragOver]   = useState(false);
+  const [rowStates,  setRowStates]  = useState({});     // { [rowIndex]: { status, refNumber } }
+  const [sessionId,  setSessionId]  = useState(null);
+  const [currentRow, setCurrentRow] = useState(-1);
+
+  // Shared
+  const [running,     setRunning]     = useState(false);
+  const [logs,        setLogs]        = useState([]);
+  const [screenshot,  setScreenshot]  = useState(null);
+  const [iteration,   setIteration]   = useState({ current: 0, max: 25 });
+  const [statusState, setStatusState] = useState('idle');
+  const [showDownload, setShowDownload] = useState(false);
+  const [dlSessionId,  setDlSessionId]  = useState(null);
+
+  const logsEndRef = useRef(null);
+  const esRef      = useRef(null);
+  const xhrRef     = useRef(null);
+
+  const addLog = useCallback((type, msg, rowIndex) => {
+    setLogs(prev => [...prev, { type, msg, time: ts(), id: Date.now() + Math.random(), rowIndex }]);
+  }, []);
+
+  useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
+
+  // ── CSV file handling ──────────────────────────────────────────────────────
+
+  function handleCsvFile(file) {
+    if (!file || !file.name.endsWith('.csv')) { alert('Please select a .csv file.'); return; }
+    setCsvFile(file);
+    const reader = new FileReader();
+    reader.onload = e => {
+      const parsed = parseCSV(e.target.result);
+      setCsvParsed(parsed);
+      setRowStates({});
+    };
+    reader.readAsText(file);
+  }
+
+  function clearCsv() {
+    setCsvFile(null); setCsvParsed(null); setRowStates({}); setShowDownload(false);
+  }
+
+  // ── Manual field helpers ──────────────────────────────────────────────────
+
+  function addField()          { setFields(p => [...p, { key: '', value: '' }]); }
+  function removeField(i)      { setFields(p => p.filter((_, idx) => idx !== i)); }
+  function updateField(i, k, v){ setFields(p => p.map((f, idx) => idx === i ? { ...f, [k]: v } : f)); }
+
+  // ── Stop ──────────────────────────────────────────────────────────────────
+
+  function stop() {
+    if (esRef.current)  { esRef.current.close();  esRef.current = null; }
+    if (xhrRef.current) { xhrRef.current.abort(); xhrRef.current = null; }
+    setRunning(false); setStatusState('idle');
+    addLog('status', 'Automation stopped by user.');
+  }
+
+  function clearAll() {
+    setLogs([]); setScreenshot(null);
+    setIteration({ current: 0, max: 25 }); setStatusState('idle');
+    setRowStates({}); setShowDownload(false); setCurrentRow(-1);
+  }
+
+  // ── Manual start ─────────────────────────────────────────────────────────
+
+  function startManual() {
+    if (!apiKey.trim())      { alert('Please enter your Anthropic API key.'); return; }
+    if (!targetUrl.trim())   { alert('Please enter a target URL.'); return; }
+    if (fields.length === 0) { alert('Please add at least one form field.'); return; }
+
+    setRunning(true); setStatusState('running');
+    setLogs([]); setScreenshot(null); setIteration({ current: 0, max: 25 }); setShowDownload(false);
+
+    const fieldsObj = {};
+    fields.forEach(f => { if (f.key.trim()) fieldsObj[f.key.trim()] = f.value; });
+
+    const params = new URLSearchParams({ url: targetUrl, fields: JSON.stringify(fieldsObj), apiKey });
+    const es = new EventSource(`/api/automate?${params}`);
+    esRef.current = es;
+
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      switch (data.type) {
+        case 'status':    addLog('status', data.message); break;
+        case 'iteration': setIteration({ current: data.iteration, max: data.max }); addLog('iteration', `Iter ${data.iteration} / ${data.max}`); break;
+        case 'action':    addLog('action', `${data.action}${data.details?.coordinate ? ` @ (${data.details.coordinate.join(', ')})` : ''}${data.details?.text ? ` → "${data.details.text}"` : ''}${data.details?.key ? ` key:${data.details.key}` : ''}`); break;
+        case 'claude_text': if (data.text) addLog('claude', data.text.slice(0, 200) + (data.text.length > 200 ? '…' : '')); break;
+        case 'screenshot': setScreenshot(data.image); if (!data.isFinal) addLog('screenshot', 'Screenshot'); break;
+        case 'error': addLog('error', data.message); setStatusState('error'); break;
+        case 'done':
+          setRunning(false);
+          if (data.success) { addLog('success', `✓ Done in ${data.iterations} iter(s)`); setStatusState('success'); }
+          else { addLog('error', data.error || 'Ended without success'); setStatusState('error'); }
+          es.close(); esRef.current = null; break;
+      }
+    };
+    es.onerror = () => {
+      addLog('error', 'Connection lost.'); setRunning(false); setStatusState('error');
+      es.close(); esRef.current = null;
+    };
+  }
+
+  // ── CSV Batch start ───────────────────────────────────────────────────────
+
+  function startCsvBatch() {
+    if (!apiKey.trim())   { alert('Please enter your Anthropic API key.'); return; }
+    if (!targetUrl.trim()){ alert('Please enter a target URL.'); return; }
+    if (!csvFile)         { alert('Please upload a CSV file.'); return; }
+
+    const sid = 'sess_' + Date.now();
+    setSessionId(sid); setDlSessionId(sid);
+    setRunning(true); setStatusState('running');
+    setLogs([]); setScreenshot(null); setIteration({ current: 0, max: 25 });
+    setShowDownload(false); setCurrentRow(-1);
+    const initStates = {};
+    csvParsed.rows.forEach((_, i) => { initStates[i] = { status: 'pending', refNumber: null }; });
+    setRowStates(initStates);
+
+    // Use XHR so we can send multipart (file upload) AND read SSE
+    const formData = new FormData();
+    formData.append('csvFile', csvFile);
+    formData.append('url', targetUrl);
+    formData.append('apiKey', apiKey);
+    formData.append('sessionId', sid);
+
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+    let buffer = '';
+
+    xhr.open('POST', '/api/automate-csv');
+    xhr.setRequestHeader('Accept', 'text/event-stream');
+
+    xhr.onprogress = () => {
+      const chunk = xhr.responseText.slice(buffer.length);
+      buffer = xhr.responseText;
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          handleCsvEvent(data);
+        } catch (_) {}
+      }
+    };
+
+    xhr.onload = xhr.onerror = () => {
+      setRunning(false); xhrRef.current = null;
+    };
+
+    xhr.send(formData);
+  }
+
+  function handleCsvEvent(data) {
+    switch (data.type) {
+      case 'batch_start':
+        addLog('status', `Batch started — ${data.total} row(s) to process`);
+        break;
+
+      case 'row_start':
+        setCurrentRow(data.rowIndex);
+        setRowStates(p => ({ ...p, [data.rowIndex]: { status: 'active', refNumber: null } }));
+        addLog('row_start', `Row ${data.rowIndex + 1} / ${data.total} started`, data.rowIndex);
+        break;
+
+      case 'row_status':
+        addLog('status', data.message, data.rowIndex);
+        break;
+
+      case 'iteration':
+        setIteration({ current: data.iteration, max: data.max });
+        addLog('iteration', `Row ${(data.rowIndex ?? 0) + 1} · Iter ${data.iteration} / ${data.max}`, data.rowIndex);
+        break;
+
+      case 'action':
+        addLog('action',
+          `${data.action}${data.details?.coordinate ? ` @ (${data.details.coordinate.join(', ')})` : ''}${data.details?.text ? ` → "${data.details.text}"` : ''}${data.details?.key ? ` key:${data.details.key}` : ''}`,
+          data.rowIndex);
+        break;
+
+      case 'claude_text':
+        if (data.text) addLog('claude', data.text.slice(0, 200) + (data.text.length > 200 ? '…' : ''), data.rowIndex);
+        break;
+
+      case 'screenshot':
+        setScreenshot(data.image);
+        break;
+
+      case 'row_done':
+        setRowStates(p => ({ ...p, [data.rowIndex]: { status: 'done', refNumber: data.refNumber } }));
+        addLog('row_done', `Row ${data.rowIndex + 1} complete — ref: ${data.refNumber}`, data.rowIndex);
+        break;
+
+      case 'row_error':
+        setRowStates(p => ({ ...p, [data.rowIndex]: { status: 'error', refNumber: 'ERROR' } }));
+        addLog('row_error', `Row ${data.rowIndex + 1} error: ${data.message}`, data.rowIndex);
+        break;
+
+      case 'error':
+        addLog('error', data.message);
+        setStatusState('error');
+        break;
+
+      case 'batch_done':
+        setRunning(false);
+        if (data.error) {
+          addLog('error', `Batch ended with error: ${data.error}`);
+          setStatusState('error');
+        } else {
+          addLog('success', `✓ Batch complete — ${data.total} row(s) processed`);
+          setStatusState('success');
+          setShowDownload(true);
+        }
+        break;
+    }
+  }
+
+  function downloadResults() {
+    if (!dlSessionId) return;
+    window.location.href = `/api/download-results/${dlSessionId}`;
+  }
+
+  const progress = mode === 'csv' && csvParsed
+    ? (Object.values(rowStates).filter(s => s.status === 'done' || s.status === 'error').length / (csvParsed.rows.length || 1)) * 100
+    : iteration.max > 0 ? (iteration.current / iteration.max) * 100 : 0;
+
+  const statusLabel = statusState === 'running' ? 'RUNNING' : statusState === 'success' ? 'COMPLETE' : statusState === 'error' ? 'ERROR' : 'STANDBY';
+
+  const showBatchTable = mode === 'csv' && csvParsed && Object.keys(rowStates).length > 0;
+
+  const iterLabel = mode === 'csv'
+    ? (currentRow >= 0 ? `ROW ${currentRow + 1} · ITER ${iteration.current}/${iteration.max}` : 'NO SIGNAL')
+    : (iteration.current > 0 ? `ITER ${iteration.current} / ${iteration.max}` : 'NO SIGNAL');
+
+  return (
+    <div id="root" style={{ display: 'grid', gridTemplateRows: 'auto 1fr', minHeight: '100vh' }}>
+
+      {/* ── Header ── */}
+      <header className="header">
+        <div className="header-logo">
+          <span className="logo-text">AUTOFORM</span>
+          <span className="logo-sub">Claude Computer-Use Agent</span>
+        </div>
+        <div className="header-status">
+          <div className={`status-dot ${statusState === 'running' ? 'running' : statusState === 'success' ? 'success' : statusState === 'error' ? 'error' : ''}`} />
+          {statusLabel}
+        </div>
+      </header>
+
+      {/* ── Main ── */}
+      <div className="main-grid">
+
+        {/* ── Config Panel ── */}
+        <aside className="config-panel">
+
+          {/* Mode Tabs */}
+          <div className="mode-tabs">
+            <button className={`mode-tab ${mode === 'manual' ? 'active' : ''}`} onClick={() => !running && setMode('manual')}>◈ Manual</button>
+            <button className={`mode-tab ${mode === 'csv'    ? 'active' : ''}`} onClick={() => !running && setMode('csv')   }>⬡ CSV Batch</button>
+          </div>
+
+          {/* API Key */}
+          <div className="section">
+            <div className="section-label">Authentication</div>
+            <div className="field-row">
+              <label>ANTHROPIC API KEY</label>
+              <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-ant-..." spellCheck="false" autoComplete="off" />
+              <span className="field-hint">Never stored — sent only to Claude API</span>
+            </div>
+          </div>
+
+          {/* Target URL */}
+          <div className="section">
+            <div className="section-label">Target</div>
+            <div className="field-row">
+              <label>FORM URL</label>
+              <input type="url" value={targetUrl} onChange={e => setTargetUrl(e.target.value)} placeholder="https://..." spellCheck="false" />
+            </div>
+          </div>
+
+          {/* ── Manual fields ── */}
+          {mode === 'manual' && (
+            <div className="section">
+              <div className="section-label">Form Data</div>
+              <div className="fields-list">
+                {fields.map((f, i) => (
+                  <div className="field-entry" key={i}>
+                    <input type="text" placeholder="Field name" value={f.key}   onChange={e => updateField(i, 'key',   e.target.value)} />
+                    <input type="text" placeholder="Value"      value={f.value} onChange={e => updateField(i, 'value', e.target.value)} />
+                    <button className="btn-icon" onClick={() => removeField(i)} title="Remove">×</button>
+                  </div>
+                ))}
+              </div>
+              <button className="btn-add-field" onClick={addField}>+ Add Field</button>
+            </div>
+          )}
+
+          {/* ── CSV Upload ── */}
+          {mode === 'csv' && (
+            <div className="section">
+              <div className="section-label">CSV Input</div>
+
+              {!csvFile ? (
+                <div
+                  className={`csv-upload-zone ${dragOver ? 'drag-over' : ''}`}
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleCsvFile(f); }}
+                >
+                  <input type="file" accept=".csv" onChange={e => { if (e.target.files[0]) handleCsvFile(e.target.files[0]); }} />
+                  <div className="csv-upload-icon">📋</div>
+                  <div className="csv-upload-label">DROP CSV FILE HERE</div>
+                  <div className="csv-upload-hint">or click to browse · .csv only · max 5MB</div>
+                </div>
+              ) : (
+                <>
+                  <div className="csv-file-info">
+                    <span className="csv-file-icon">📋</span>
+                    <span className="csv-file-name">{csvFile.name}</span>
+                    <span className="csv-file-rows">{csvParsed?.rows.length} row(s)</span>
+                    <button className="btn-clear-csv" onClick={clearCsv} title="Remove file">×</button>
+                  </div>
+                  {csvParsed && csvParsed.rows.length > 0 && (
+                    <div className="csv-preview">
+                      <table>
+                        <thead><tr>{csvParsed.headers.map(h => <th key={h}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {csvParsed.rows.slice(0, 5).map((row, i) => (
+                            <tr key={i}>{csvParsed.headers.map(h => <td key={h} title={row[h]}>{row[h]}</td>)}</tr>
+                          ))}
+                          {csvParsed.rows.length > 5 && (
+                            <tr><td colSpan={csvParsed.headers.length} style={{ color: 'var(--text-lo)', textAlign: 'center' }}>+{csvParsed.rows.length - 5} more rows</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div className="field-hint" style={{ marginTop: 8 }}>
+                    CSV columns are mapped to form fields by header name
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          {/* Start button */}
+          <button
+            className="btn-start"
+            disabled={running}
+            onClick={mode === 'manual' ? startManual : startCsvBatch}
+          >
+            {running ? 'RUNNING…' : mode === 'csv' ? 'RUN CSV BATCH' : 'START AUTOMATION'}
+          </button>
+
+          {running && <button className="btn-stop" onClick={stop}>■ STOP</button>}
+
+          {/* Download button */}
+          {showDownload && (
+            <button className="btn-download" onClick={downloadResults}>
+              ⬇ DOWNLOAD reference-numbers.csv
+            </button>
+          )}
+
+        </aside>
+
+        {/* ── Output Panel ── */}
+        <div className="output-panel">
+
+          {/* Screen Viewer */}
+          <div className="screen-viewer">
+            <div className="screen-toolbar">
+              <span className="screen-title">
+                {statusState === 'running' ? '⬡ LIVE FEED' : '◻ SCREEN CAPTURE'}
+              </span>
+              <span className="iteration-badge">{iterLabel}</span>
+            </div>
+
+            <div className="progress-bar-wrap">
+              <div className="progress-bar" style={{ width: `${progress}%` }} />
+            </div>
+
+            {/* Batch row table (only in CSV mode after start) */}
+            {showBatchTable && (
+              <BatchTable
+                csvRows={csvParsed.rows}
+                csvHeaders={csvParsed.headers}
+                rowStates={rowStates}
+                currentRow={currentRow}
+              />
+            )}
+
+            <div className="screen-content">
+              {screenshot ? (
+                <img key={screenshot.slice(-20)} className="screenshot-img"
+                  src={`data:image/png;base64,${screenshot}`} alt="Browser screenshot" />
+              ) : (
+                <div className="screen-placeholder">
+                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                    <rect x="4" y="10" width="56" height="38" rx="3" stroke="currentColor" strokeWidth="1.5"/>
+                    <line x1="20" y1="48" x2="44" y2="48" stroke="currentColor" strokeWidth="1.5"/>
+                    <line x1="28" y1="48" x2="28" y2="54" stroke="currentColor" strokeWidth="1.5"/>
+                    <line x1="36" y1="48" x2="36" y2="54" stroke="currentColor" strokeWidth="1.5"/>
+                    <line x1="22" y1="54" x2="42" y2="54" stroke="currentColor" strokeWidth="1.5"/>
+                    <circle cx="32" cy="29" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2"/>
+                  </svg>
+                  <p>Awaiting automation start</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Log Panel */}
+          <div className="log-panel">
+            <div className="log-toolbar">
+              <span className="log-title">◈ Activity Log</span>
+              <button className="btn-clear" onClick={clearAll}>CLEAR</button>
+            </div>
+            <div className="log-entries">
+              {logs.length === 0 && (
+                <div style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--text-lo)' }}>
+                  — log empty —
+                </div>
+              )}
+              {logs.map(entry => (
+                <div className="log-entry" key={entry.id}>
+                  <span className="log-time">{entry.time}</span>
+                  <span className="log-icon">{ICONS[entry.type] || '·'}</span>
+                  {entry.rowIndex !== undefined && (
+                    <span className="log-row-tag">[R{entry.rowIndex + 1}]</span>
+                  )}
+                  <span className={`log-msg ${entry.type}`}>{entry.msg}</span>
+                </div>
+              ))}
+              <div ref={logsEndRef} />
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
